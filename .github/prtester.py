@@ -17,10 +17,9 @@ def testBridges(bridges,status):
             bridgeid = bridge.get('id')
             bridgeid = bridgeid.split('-')[1] # this extracts a readable bridge name from the bridge metadata
             print(bridgeid + "\n")
-            bridgestring = '/?action=display&bridge=' + bridgeid + '&format=Html'
+            bridgestring = f'/?action=display&bridge={bridgeid}&format=Html'
             forms = bridge.find_all("form")
-            formid = 1
-            for form in forms:
+            for formid, form in enumerate(forms, start=1):
                 # a bridge can have multiple contexts, named 'forms' in html
                 # this code will produce a fully working formstring that should create a working feed when called
                 # this will create an example feed for every single context, to test them all
@@ -35,20 +34,35 @@ def testBridges(bridges,status):
                 for parameter in parameters:
                     if parameter.get('type') == 'hidden' and parameter.get('name') == 'context':
                         cleanvalue = parameter.get('value').replace(" ","+")
-                        formstring = formstring + '&' + parameter.get('name') + '=' + cleanvalue
-                    if parameter.get('type') == 'number' or parameter.get('type') == 'text':
-                        if parameter.has_attr('required'):
-                            if parameter.get('placeholder') == '':
-                                if parameter.get('value') == '':
-                                    errormessages.append(parameter.get('name'))
-                                else:
-                                    formstring = formstring + '&' + parameter.get('name') + '=' + parameter.get('value')
+                        formstring = f'{formstring}&' + parameter.get('name') + '=' + cleanvalue
+                    if parameter.get('type') in [
+                        'number',
+                        'text',
+                    ] and parameter.has_attr('required'):
+                        if parameter.get('placeholder') == '':
+                            if parameter.get('value') == '':
+                                errormessages.append(parameter.get('name'))
                             else:
-                                formstring = formstring + '&' + parameter.get('name') + '=' + parameter.get('placeholder')
+                                formstring = (
+                                    f'{formstring}&'
+                                    + parameter.get('name')
+                                    + '='
+                                    + parameter.get('value')
+                                )
+
+                        else:
+                            formstring = (
+                                f'{formstring}&'
+                                + parameter.get('name')
+                                + '='
+                                + parameter.get('placeholder')
+                            )
+
                     # same thing, just for checkboxes. If a checkbox is checked per default, it gets added to the formstring
-                    if parameter.get('type') == 'checkbox':
-                        if parameter.has_attr('checked'):
-                            formstring = formstring + '&' + parameter.get('name') + '=on'
+                    if parameter.get(
+                        'type'
+                    ) == 'checkbox' and parameter.has_attr('checked'):
+                        formstring = f'{formstring}&' + parameter.get('name') + '=on'
                 for listing in lists:
                     selectionvalue = ''
                     listname = listing.get('name')
@@ -59,11 +73,10 @@ def testBridges(bridges,status):
                         if firstselectionentry:
                             selectionvalue = selectionentry.get('value')
                             firstselectionentry = 0
-                        else:
-                            if 'selected' in selectionentry.attrs:
-                                selectionvalue = selectionentry.get('value')
-                                break
-                    formstring = formstring + '&' + listname + '=' + selectionvalue
+                        elif 'selected' in selectionentry.attrs:
+                            selectionvalue = selectionentry.get('value')
+                            break
+                    formstring = f'{formstring}&{listname}={selectionvalue}'
                 if not errormessages:
                     # if all example/default values are present, form the full request string, run the request, replace the static css
                     # file with the url of em's public instance and then upload it to termpad.com, a pastebin-like-site.
@@ -71,28 +84,23 @@ def testBridges(bridges,status):
                     pagetext = r.text.replace('static/HtmlFormat.css','https://feed.eugenemolotov.ru/static/HtmlFormat.css')
                     pagetext = pagetext.encode("utf_8")
                     termpad = requests.post(url="https://termpad.com/", data=pagetext)
-                    termpadurl = termpad.text
-                    termpadurl = termpadurl.replace('termpad.com/','termpad.com/raw/')
-                    termpadurl = termpadurl.replace('\n','')
-                    with open(os.getcwd() + '/comment.txt', 'a+') as file:
-                        file.write("\n")
-                        file.write("| [`" + bridgeid + '-' + status + '-context' + str(formid) + "`](" + termpadurl + ") | " + date_time + " |")
                 else:
                     # if there are errors (which means that a required value has no example or default value), log out which error appeared
                     termpad = requests.post(url="https://termpad.com/", data=str(errormessages))
-                    termpadurl = termpad.text
-                    termpadurl = termpadurl.replace('termpad.com/','termpad.com/raw/')
-                    termpadurl = termpadurl.replace('\n','')
-                    with open(os.getcwd() + '/comment.txt', 'a+') as file:
-                        file.write("\n")
-                        file.write("| [`" + bridgeid + '-' + status + '-context' + str(formid) + "`](" + termpadurl + ") | " + date_time + " |")
-                formid += 1
+                termpadurl = termpad.text
+                termpadurl = termpadurl.replace('termpad.com/','termpad.com/raw/')
+                termpadurl = termpadurl.replace('\n','')
+                with open(f'{os.getcwd()}/comment.txt', 'a+') as file:
+                    file.write("\n")
+                    file.write(
+                        f"| [`{bridgeid}-{status}-context{str(formid)}`]({termpadurl}) | {date_time} |"
+                    )
 
 gitstatus = ["current", "pr"]
 now = datetime.now()
 date_time = now.strftime("%Y-%m-%d, %H:%M:%S")
 
-with open(os.getcwd() + '/comment.txt', 'w+') as file:
+with open(f'{os.getcwd()}/comment.txt', 'w+') as file:
     file.write(''' ## Pull request artifacts
 | file | last change |
 | ---- | ------ |''')
@@ -102,7 +110,7 @@ for status in gitstatus: # run this twice, once for the current version, once fo
         port = "3000" # both ports are defined in the corresponding workflow .yml file
     elif status == "pr":
         port = "3001"
-    URL = "http://localhost:" + port
+    URL = f"http://localhost:{port}"
     page = requests.get(URL) # Use python requests to grab the rss-bridge main page
     soup = BeautifulSoup(page.content, "html.parser") # use bs4 to turn the page into soup
     bridges = soup.find_all("section") # get a soup-formatted list of all bridges on the rss-bridge page
