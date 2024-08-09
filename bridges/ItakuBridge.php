@@ -522,7 +522,7 @@ class ItakuBridge extends BridgeAbstract
     {
         $url = self::URI . '/api/commissions/' . $id . '/?format=json';
         $uri = self::URI . '/commissions/' . $id;
-        // Debug::log(var_dump($metadata));
+
         $data = $metadata ?? $this->getData($url, true, true)
             or returnServerError("Could not load $url");
 
@@ -664,11 +664,10 @@ class ItakuBridge extends BridgeAbstract
 
     private function getData(string $url, bool $cache = false, bool $getJSON = false, array $httpHeaders = [], array $curlOptions = [])
     {
-        // Debug::log($url);
         if ($getJSON) { //get JSON object
             if ($cache) {
                 $data = $this->loadCacheValue($url);
-                if (is_null($data)) {
+                if (!$data) {
                     $data = getContents($url, $httpHeaders, $curlOptions);
                     $this->saveCacheValue($url, $data);
                 }
