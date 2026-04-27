@@ -221,6 +221,13 @@ class HeiseBridge extends FeedExpander
                 }
             }
         }
+
+        // strip p tags inside of figcaption to avoid doubling it
+        foreach ($article->find('figcaption p') as $key => $elem) {
+            $elem->outertext = $elem->plaintext;
+            $reloadneeded = 1;
+        }
+
         if (isset($reloadneeded)) {
             $article = str_get_html($article->outertext);
         }
